@@ -22,6 +22,44 @@
 (defn messages-for-topic [topic]
   (subseq @messages  >= {:topic topic} < {:topic (str topic "~")}))
 
+;;;
+
+;;; defnode introduces a computation node. Arguments are
+;;; - a name
+;;; - a collection of other nodes or topics which are listened for
+;;; - a computation, which is run whenever there is a new message
+;;;   from one of the nodes we're listening to
+;;;
+;;; whenever the result of the computation is non-nil, it is sent to
+;;; the message store as a new message.  Not convinced that "non-nil"
+;;; is the best way to do this, but haven't thought of a better one yet
+;;;
+;;; within the computation body we can look up events in the message store.
+;;; we would like, probably, to blow up if the computation requests
+;;; events on topics which it's not subscribed to, otherwise we can't
+;;; be sure that it runs as often as it needs to.
+
+
+(defnode drop-outliers ["sensors/some-input"]
+  (let [reading (latest "sensors/some-input")]
+    (if (< 10 reading 40)
+      {:topic "node/some-input/clamped" :payload reading}
+      nil)))
+
+
+(defnode front-door-security-light ["sensors/porch/pir"]
+  ;; turn on iff the smoothed pir was over threshold for > 10 seconds
+  ;; in the last minute
+  (let [threshold 127 ; dunno, this is a made up number
+        readings (smooth (recent "sensors/porch/pir" 60) 5)]
+    ;; this always 
+    (if (> (sum-time readings #(> % threshold)) 10) 255 0)))
+
+
+
+
+
+
 ;;; hook up an mqtt listener to push messages into the store
 ;;; and activate processing nodes that are interested in them
 
